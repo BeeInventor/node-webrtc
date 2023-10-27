@@ -1,5 +1,13 @@
-cmake_minimum_required(VERSION 3.12)
-project(node-webrtc)
+cmake_minimum_required(VERSION 3.15)
+cmake_policy(SET CMP0091 NEW)
+cmake_policy(SET CMP0042 NEW)
+
+if (APPLE AND "$ENV{TARGET_ARCH}" STREQUAL "arm64")
+  set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE INTERNAL "" FORCE)
+endif()
+
+set(MODULE wrtc)
+project(${MODULE})
 
 include(ExternalProject)
 find_package(Git REQUIRED)
@@ -14,7 +22,7 @@ ExternalProject_Add(
   project_depot_tools
 
   GIT_REPOSITORY    https://chromium.googlesource.com/chromium/tools/depot_tools.git
-  GIT_TAG           631522ca84713b20523c7e95d99f70f0c38a6d5c
+  GIT_TAG           4eaefabc5dca618fc07ac550fda35ba7a45a38f8
 
   PREFIX            ${CMAKE_BINARY_DIR}/external/depot_tools/prefix
   TMP_DIR           ${CMAKE_BINARY_DIR}/external/depot_tools/tmp
@@ -106,7 +114,6 @@ set(libc++abi_objects
   cxa_guard.o
   cxa_handlers.o
   cxa_personality.o
-  #cxa_unexpected.o
   cxa_vector.o
   cxa_virtual.o
   fallback_malloc.o
@@ -129,7 +136,11 @@ set_target_properties(libc++abi PROPERTIES IMPORTED_OBJECTS_DEBUG "${libc++abi_o
 # libwebrtc
 # -----------------------------------------------------------------------------
 
-set(WEBRTC_REVISION branch-heads/4500)
+# M87: branch-heads/4280
+# M91: branch-heads/4472
+# M92: branch-heads/4515
+# M94: branch-heads/4606
+set(WEBRTC_REVISION branch-heads/4280)
 
 list(APPEND GN_GEN_ARGS
   rtc_build_examples=false
@@ -140,25 +151,26 @@ list(APPEND GN_GEN_ARGS
   use_lld=false
   rtc_use_h264=true
 )
+
+if (APPLE)
+  list(APPEND GN_GEN_ARGS
+    use_custom_libcxx=true
+  )
+else()
+  list(APPEND GN_GEN_ARGS
+    use_custom_libcxx=false
+  )
+endif()
+
 if ("$ENV{TARGET_ARCH}" STREQUAL "arm")
   list(APPEND GN_GEN_ARGS
-    target_os="linux"
     target_cpu="arm"
     rtc_build_tools=true
-    treat_warnings_as_errors=false
-    fatal_linker_warnings=false
   )
 elseif ("$ENV{TARGET_ARCH}" STREQUAL "arm64")
-  if(NOT APPLE)
-  list(APPEND GN_GEN_ARGS
-    target_os="linux"
-  )
-  endif()
   list(APPEND GN_GEN_ARGS
     target_cpu="arm64"
     rtc_build_tools=true
-    treat_warnings_as_errors=false
-    fatal_linker_warnings=false
   )
 else()
   list(APPEND GN_GEN_ARGS
@@ -166,9 +178,6 @@ else()
   )
 endif()
 
-if (WIN32)
-  list(APPEND GN_GEN_ARGS is_clang=false)
-endif()
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   list(APPEND GN_GEN_ARGS is_debug=true)
 else()
@@ -196,12 +205,10 @@ if (WIN32)
 else()
   set(byproducts
     ${libc++_objects}
+    ${libc++abi_objects}
     ${libwebrtc_binary_dir}/obj/libwebrtc.a
     ${libwebrtc_binary_dir}/obj/pc/libpeerconnection.a
   )
-  if (NOT APPLE)
-    list(APPEND byproducts ${libc++abi_objects})
-  endif()
 endif()
 
 ExternalProject_Add(
@@ -248,7 +255,10 @@ else()
   set_property(TARGET libpeerconnection PROPERTY IMPORTED_LOCATION "${libwebrtc_binary_dir}/obj/pc/libpeerconnection.a")
 endif()
 
-set(libc++_include_dir "${libwebrtc_source_dir}/src/buildtools/third_party/libc++/trunk/include")
+set(libc++_include_dir
+  "${libwebrtc_source_dir}/src/buildtools/third_party/libc++/trunk/include"
+  "${libwebrtc_source_dir}/src/buildtools/third_party/libc++"
+)
 set(libc++abi_include_dir "${libwebrtc_source_dir}/src/buildtools/third_party/libc++abi/trunk/include")
 
 # NOTE(mroberts): I would like this to be INTERFACE.
@@ -289,27 +299,7 @@ set(catch2_install_dir ${SOURCE_DIR})
 # node-webrtc
 # -----------------------------------------------------------------------------
 
-#set(MODULE wrtc)
-#include(${CMAKE_SOURCE_DIR}/NodeJS.cmake)
-#if(DEFINED ENV{npm_config_runtime})
-#  if($ENV{npm_config_runtime} STREQUAL "electron")
-#    if(NOT DEFINED ENV{npm_config_target})
-#      message(FATAL_ERROR "npm_config_target must be defined for electron build")
-#    endif()
-#    list(APPEND nodejs_init_args "VERSION" v$ENV{npm_config_target})
-#    if(NOT DEFINED ENV{npm_config_disturl})
-#      message(FATAL_ERROR "npm_config_disturl must be defined for electron build")
-#    endif()
-#    list(APPEND nodejs_init_args "URL" $ENV{npm_config_disturl})
-#    if($ENV{npm_config_target} STRLESS "4")
-#      list(APPEND nodejs_init_args "NAME" "iojs")
-#    endif()
-#  endif()
-#endif()
-#nodejs_init(${nodejs_init_args})
-
 file(GLOB_RECURSE MODULE_SRC src/*.cc src/*.h)
-#add_nodejs_module(${MODULE} ${MODULE_SRC})
 add_library(${MODULE} SHARED ${MODULE_SRC} ${CMAKE_JS_SRC})
 set_target_properties(${MODULE} PROPERTIES PREFIX "" SUFFIX ".node")
 
@@ -323,15 +313,12 @@ if(NOT clang_tidy_path STREQUAL "clang_tidy_path-NOTFOUND")
   set_property(TARGET ${MODULE} PROPERTY CXX_CLANG_TIDY ${clang_tidy_path})
 endif()
 
-#set(node_addon_api_dir ${CMAKE_SOURCE_DIR}/node_modules/node-addon-api)
-
 # NOTE(mroberts): Workaround for
 #
 #   https://gitlab.kitware.com/cmake/cmake/issues/15052
 #
 # is to include all the header files here.
 target_include_directories(${MODULE} SYSTEM PRIVATE
-  #${node_addon_api_dir}/..
   ${CMAKE_JS_INC}
   ${CMAKE_SOURCE_DIR}/node_modules
   ${libwebrtc_source_dir}
@@ -364,9 +351,9 @@ target_compile_definitions(${MODULE} PRIVATE
 )
 
 if(WIN32)
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT /GR-")
-  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd /GR- -D_HAS_ITERATOR_DEBUGGING=0")
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /FORCE:UNRESOLVED")
+  set_property(TARGET ${MODULE}
+    PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+  )
 
   target_link_libraries(${MODULE} PRIVATE
     dmoguids.lib
@@ -383,6 +370,7 @@ if(WIN32)
     -DNOGDI
     -DNOMINMAX
     -DWEBRTC_WIN
+    "$<$<CONFIG:Debug>:-D_HAS_ITERATOR_DEBUGGING=0>"
   )
 else()
   target_link_libraries(${MODULE} PRIVATE
