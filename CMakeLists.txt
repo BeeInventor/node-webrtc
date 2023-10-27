@@ -137,6 +137,7 @@ list(APPEND GN_GEN_ARGS
   rtc_enable_protobuf=false
   rtc_include_pulse_audio=false
   rtc_include_tests=false
+  use_lld=false
   rtc_use_h264=true
 )
 if ("$ENV{TARGET_ARCH}" STREQUAL "arm")
@@ -288,27 +289,30 @@ set(catch2_install_dir ${SOURCE_DIR})
 # node-webrtc
 # -----------------------------------------------------------------------------
 
-set(MODULE wrtc)
-include(${CMAKE_SOURCE_DIR}/NodeJS.cmake)
-if(DEFINED ENV{npm_config_runtime})
-  if($ENV{npm_config_runtime} STREQUAL "electron")
-    if(NOT DEFINED ENV{npm_config_target})
-      message(FATAL_ERROR "npm_config_target must be defined for electron build")
-    endif()
-    list(APPEND nodejs_init_args "VERSION" v$ENV{npm_config_target})
-    if(NOT DEFINED ENV{npm_config_disturl})
-      message(FATAL_ERROR "npm_config_disturl must be defined for electron build")
-    endif()
-    list(APPEND nodejs_init_args "URL" $ENV{npm_config_disturl})
-    if($ENV{npm_config_target} STRLESS "4")
-      list(APPEND nodejs_init_args "NAME" "iojs")
-    endif()
-  endif()
-endif()
-nodejs_init(${nodejs_init_args})
+#set(MODULE wrtc)
+#include(${CMAKE_SOURCE_DIR}/NodeJS.cmake)
+#if(DEFINED ENV{npm_config_runtime})
+#  if($ENV{npm_config_runtime} STREQUAL "electron")
+#    if(NOT DEFINED ENV{npm_config_target})
+#      message(FATAL_ERROR "npm_config_target must be defined for electron build")
+#    endif()
+#    list(APPEND nodejs_init_args "VERSION" v$ENV{npm_config_target})
+#    if(NOT DEFINED ENV{npm_config_disturl})
+#      message(FATAL_ERROR "npm_config_disturl must be defined for electron build")
+#    endif()
+#    list(APPEND nodejs_init_args "URL" $ENV{npm_config_disturl})
+#    if($ENV{npm_config_target} STRLESS "4")
+#      list(APPEND nodejs_init_args "NAME" "iojs")
+#    endif()
+#  endif()
+#endif()
+#nodejs_init(${nodejs_init_args})
 
 file(GLOB_RECURSE MODULE_SRC src/*.cc src/*.h)
-add_nodejs_module(${MODULE} ${MODULE_SRC})
+#add_nodejs_module(${MODULE} ${MODULE_SRC})
+add_library(${MODULE} SHARED ${MODULE_SRC} ${CMAKE_JS_SRC})
+set_target_properties(${MODULE} PROPERTIES PREFIX "" SUFFIX ".node")
+
 set_property(TARGET ${MODULE} PROPERTY CXX_STANDARD 14)
 
 if(NOT iwyu_path STREQUAL "iwyu_path-NOTFOUND")
@@ -319,7 +323,7 @@ if(NOT clang_tidy_path STREQUAL "clang_tidy_path-NOTFOUND")
   set_property(TARGET ${MODULE} PROPERTY CXX_CLANG_TIDY ${clang_tidy_path})
 endif()
 
-set(node_addon_api_dir ${CMAKE_SOURCE_DIR}/node_modules/node-addon-api)
+#set(node_addon_api_dir ${CMAKE_SOURCE_DIR}/node_modules/node-addon-api)
 
 # NOTE(mroberts): Workaround for
 #
@@ -327,7 +331,9 @@ set(node_addon_api_dir ${CMAKE_SOURCE_DIR}/node_modules/node-addon-api)
 #
 # is to include all the header files here.
 target_include_directories(${MODULE} SYSTEM PRIVATE
-  ${node_addon_api_dir}/..
+  #${node_addon_api_dir}/..
+  ${CMAKE_JS_INC}
+  ${CMAKE_SOURCE_DIR}/node_modules
   ${libwebrtc_source_dir}
   ${libwebrtc_source_dir}/webrtc
   ${libwebrtc_source_dir}/webrtc/third_party/abseil-cpp
@@ -349,6 +355,7 @@ target_link_libraries(${MODULE} PRIVATE
   ${CMAKE_THREAD_LIBS_INIT}
   libpeerconnection
   libwebrtc
+  ${CMAKE_JS_LIB}
 )
 
 target_compile_definitions(${MODULE} PRIVATE
@@ -378,78 +385,62 @@ if(WIN32)
     -DWEBRTC_WIN
   )
 else()
-  # NOTE(mroberts): Workaround for
-  #
-  #   https://gitlab.kitware.com/cmake/cmake/issues/15052
-  #
-  # is to include all the header files here.
-  target_include_directories(${MODULE} SYSTEM PRIVATE
-    ${libc++_include_dir}
-    ${libc++abi_include_dir}
-  )
-
-  # NOTE(mroberts): On Linux and macOS, we statically link the same libc++ and
-  # libc++abi libraries that libwebrtc builds against.
   target_link_libraries(${MODULE} PRIVATE
     -lc
     -lm
-    libc++
   )
-  if(NOT APPLE)
-    target_link_libraries(${MODULE} PRIVATE
-      libc++abi
-    )
-  endif()
 
   target_compile_options(${MODULE} PRIVATE
     -fno-rtti
     -fvisibility=hidden
-    -nostdinc++
-    -nodefaultlibs
     -Wall
     -Wextra
     -Wno-missing-field-initializers
     -Wno-uninitialized
     -Wno-unused-local-typedefs
     -Wno-unused-variable
-    -Wno-suggest-override
     -Wpedantic
+    "$<$<CONFIG:Debug>:-g>"
   )
-  if(APPLE)  # actually should be if(clang), but there is no such flag
-    target_compile_options(${MODULE} PRIVATE
-      -Wno-missing-prototypes
-    )
-  endif()
 
   target_compile_definitions(${MODULE} PRIVATE
-    -D_LIBCPP_ABI_UNSTABLE
     -DWEBRTC_POSIX=1
+    "$<$<CONFIG:Debug>:-DDEBUG>"
   )
 
-  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  if (APPLE OR "$ENV{TARGET_ARCH}" STREQUAL "arm" OR "$ENV{TARGET_ARCH}" STREQUAL "arm64")
+    # NOTE(mroberts): Workaround for
+    #
+    #   https://gitlab.kitware.com/cmake/cmake/issues/15052
+    #
+    # is to include all the header files here.
+    target_include_directories(${MODULE} SYSTEM PRIVATE
+      ${libc++_include_dir}
+      ${libc++abi_include_dir}
+    )
+
+  # NOTE(mroberts): On Arm Linux and macOS, we statically link the same libc++ and
+    # libc++abi libraries that libwebrtc builds against.
+    target_link_libraries(${MODULE} PRIVATE
+      libc++
+      libc++abi
+    )
+
     target_compile_options(${MODULE} PRIVATE
-      -g
+      -nostdinc++
+      -nodefaultlibs
     )
 
     target_compile_definitions(${MODULE} PRIVATE
-      -DDEBUG
+      -D_LIBCPP_ABI_UNSTABLE
     )
   endif()
 
-  if(APPLE)
+  if (APPLE)
     target_link_libraries(${MODULE} PRIVATE
       "-framework AppKit"
       "-framework AVFoundation"
     )
-
-    if ("$ENV{TARGET_ARCH}" STREQUAL "arm64")
-      target_compile_options(${MODULE} PRIVATE
-        -arch arm64
-      )
-      target_link_options(${MODULE} PRIVATE
-        -arch arm64
-      )
-    endif()
 
     target_compile_options(${MODULE} PRIVATE
       -Weverything
@@ -470,7 +461,6 @@ else()
     )
 
     target_compile_definitions(${MODULE} PRIVATE
-      -D_LIBCPP_ABI_UNSTABLE
       -DWEBRTC_MAC
       -DWEBRTC_IOS
     )
@@ -508,11 +498,6 @@ else()
         set(CMAKE_C_COMPILER ${tools}/bin/aarch64-linux-gnu-gcc)
         set(CMAKE_CXX_COMPILER ${tools}/bin/aarch64-linux-gnu-g++)
       endif()
-    else()
-      target_compile_options(${MODULE} PRIVATE
-        -B${libwebrtc_source_dir}/src/third_party/binutils/Linux_x64/Release/bin
-        --sysroot=${libwebrtc_source_dir}/src/build/linux/debian_sid_amd64-sysroot
-      )
     endif()
   endif()
 endif()
