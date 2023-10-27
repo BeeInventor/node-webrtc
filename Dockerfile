@@ -2,7 +2,6 @@
 # https://github.com/BeeInventor/node-webrtc/blob/develop/docs/build-from-source.md
 FROM node:18 AS build
 ENV SKIP_DOWNLOAD=true
-ENV DEBUG=true
 WORKDIR /app
 RUN git clone https://github.com/BeeInventor/node-webrtc
 WORKDIR /app/node-webrtc

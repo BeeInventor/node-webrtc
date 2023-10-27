@@ -16,6 +16,8 @@ if (process.platform === 'win32') {
   args.push('-Ninja');
 }
 
+args.push('-l verbose')
+
 function main() {
   console.log('Running cmake-js ' + args.join(' '));
   let { status } = spawnSync('cmake-js', args, {
