@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.4",
+    "cmake-js": "^7.2.1",
     "nan": "^2.3.2",
     "node-addon-api": "^1.6.2",
     "node-cmake": "2.3.2",
@@ -89,5 +90,8 @@
     "wpt:reset": "rimraf ./test/web-platform-tests/tests && npm run wpt:init",
     "wpt:test": "mocha test/web-platform-tests/run-wpts.js --exit",
     "wpt:update": "git submodule update --recursive --remote --force && cd test/web-platform-tests/tests && python wpt.py manifest --path ../wpt-manifest.json"
-  }
+  },
+  "bundleDependencies": [
+    "@mapbox/node-pre-gyp"
+  ]
 }
