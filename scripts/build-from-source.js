@@ -29,7 +29,7 @@ function main() {
   }
 
   console.log('Running cmake-js build');
-  status = spawnSync('cmake-js', ['build -l verbose'], {
+  status = spawnSync('cmake-js', ['build -l silly'], {
     shell: true,
     stdio: 'inherit'
   }).status;
