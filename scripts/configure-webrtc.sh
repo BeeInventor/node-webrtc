@@ -11,6 +11,10 @@ cd ${SOURCE_DIR}
 if [ "$(uname)" == "Linux" ]; then
 if [ "$TARGET_ARCH" == "arm" ]; then
   python build/linux/sysroot_scripts/install-sysroot.py --arch=arm
+  strings /usr/lib/x86_64-linux-gnu/libstdc++.so.6 | grep GLIBCXX
+  ls -la /usr/lib/x86_64-linux-gnu/libstdc++.so.6
+  ln -sf /usr/lib/x86_64-linux-gnu/libstdc+.so.6 build/external/libwebrtc/download/src/third_party/llvm-build/Release+Asserts/lib/libstdc++.so.6
+  ls -la build/external/libwebrtc/download/src/third_party/llvm-build/Release+Asserts/lib/libstdc++.so.6
 elif [ "$TARGET_ARCH" == "arm64" ]; then
   python build/linux/sysroot_scripts/install-sysroot.py --arch=arm64
 else
