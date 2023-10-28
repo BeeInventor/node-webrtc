@@ -1,13 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-cmake_policy(SET CMP0091 NEW)
-cmake_policy(SET CMP0042 NEW)
-
-if (APPLE AND "$ENV{TARGET_ARCH}" STREQUAL "arm64")
-  set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE INTERNAL "" FORCE)
-endif()
-
-set(MODULE wrtc)
-project(${MODULE})
+project(node-webrtc)
 
 include(ExternalProject)
 find_package(Git REQUIRED)
@@ -22,7 +14,7 @@ ExternalProject_Add(
   project_depot_tools
 
   GIT_REPOSITORY    https://chromium.googlesource.com/chromium/tools/depot_tools.git
-  GIT_TAG           4eaefabc5dca618fc07ac550fda35ba7a45a38f8
+  GIT_TAG           650096367cd9900e499052c49179b33b68fa1ac9
 
   PREFIX            ${CMAKE_BINARY_DIR}/external/depot_tools/prefix
   TMP_DIR           ${CMAKE_BINARY_DIR}/external/depot_tools/tmp
@@ -114,6 +106,7 @@ set(libc++abi_objects
   cxa_guard.o
   cxa_handlers.o
   cxa_personality.o
+  #cxa_unexpected.o
   cxa_vector.o
   cxa_virtual.o
   fallback_malloc.o
@@ -136,10 +129,6 @@ set_target_properties(libc++abi PROPERTIES IMPORTED_OBJECTS_DEBUG "${libc++abi_o
 # libwebrtc
 # -----------------------------------------------------------------------------
 
-# M87: branch-heads/4280
-# M91: branch-heads/4472
-# M92: branch-heads/4515
-# M94: branch-heads/4606
 set(WEBRTC_REVISION branch-heads/4500)
 
 list(APPEND GN_GEN_ARGS
@@ -148,29 +137,27 @@ list(APPEND GN_GEN_ARGS
   rtc_enable_protobuf=false
   rtc_include_pulse_audio=false
   rtc_include_tests=false
-  use_lld=false
   rtc_use_h264=true
 )
-
-if (APPLE)
-  list(APPEND GN_GEN_ARGS
-    use_custom_libcxx=true
-  )
-else()
-  list(APPEND GN_GEN_ARGS
-    use_custom_libcxx=false
-  )
-endif()
-
 if ("$ENV{TARGET_ARCH}" STREQUAL "arm")
   list(APPEND GN_GEN_ARGS
+    target_os="linux"
     target_cpu="arm"
     rtc_build_tools=true
+    treat_warnings_as_errors=false
+    fatal_linker_warnings=false
   )
 elseif ("$ENV{TARGET_ARCH}" STREQUAL "arm64")
+  if(NOT APPLE)
+  list(APPEND GN_GEN_ARGS
+    target_os="linux"
+  )
+  endif()
   list(APPEND GN_GEN_ARGS
     target_cpu="arm64"
     rtc_build_tools=true
+    treat_warnings_as_errors=false
+    fatal_linker_warnings=false
   )
 else()
   list(APPEND GN_GEN_ARGS
@@ -178,6 +165,9 @@ else()
   )
 endif()
 
+if (WIN32)
+  list(APPEND GN_GEN_ARGS is_clang=false)
+endif()
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   list(APPEND GN_GEN_ARGS is_debug=true)
 else()
@@ -205,7 +195,6 @@ if (WIN32)
 else()
   set(byproducts
     ${libc++_objects}
-    ${libc++abi_objects}
     ${libwebrtc_binary_dir}/obj/libwebrtc.a
     ${libwebrtc_binary_dir}/obj/pc/libpeerconnection.a
   )
@@ -258,10 +247,7 @@ else()
   set_property(TARGET libpeerconnection PROPERTY IMPORTED_LOCATION "${libwebrtc_binary_dir}/obj/pc/libpeerconnection.a")
 endif()
 
-set(libc++_include_dir
-  "${libwebrtc_source_dir}/src/buildtools/third_party/libc++/trunk/include"
-  "${libwebrtc_source_dir}/src/buildtools/third_party/libc++"
-)
+set(libc++_include_dir "${libwebrtc_source_dir}/src/buildtools/third_party/libc++/trunk/include")
 set(libc++abi_include_dir "${libwebrtc_source_dir}/src/buildtools/third_party/libc++abi/trunk/include")
 
 # NOTE(mroberts): I would like this to be INTERFACE.
@@ -302,6 +288,7 @@ set(catch2_install_dir ${SOURCE_DIR})
 # node-webrtc
 # -----------------------------------------------------------------------------
 
+set(MODULE wrtc)
 include(${CMAKE_SOURCE_DIR}/NodeJS.cmake)
 if(DEFINED ENV{npm_config_runtime})
   if($ENV{npm_config_runtime} STREQUAL "electron")
@@ -321,10 +308,7 @@ endif()
 nodejs_init(${nodejs_init_args})
 
 file(GLOB_RECURSE MODULE_SRC src/*.cc src/*.h)
-#add_library(${MODULE} SHARED ${MODULE_SRC} ${CMAKE_JS_SRC})
 add_nodejs_module(${MODULE} ${MODULE_SRC})
-set_target_properties(${MODULE} PROPERTIES PREFIX "" SUFFIX ".node")
-
 set_property(TARGET ${MODULE} PROPERTY CXX_STANDARD 14)
 
 if(NOT iwyu_path STREQUAL "iwyu_path-NOTFOUND")
@@ -335,7 +319,6 @@ if(NOT clang_tidy_path STREQUAL "clang_tidy_path-NOTFOUND")
   set_property(TARGET ${MODULE} PROPERTY CXX_CLANG_TIDY ${clang_tidy_path})
 endif()
 
-# add
 set(node_addon_api_dir ${CMAKE_SOURCE_DIR}/node_modules/node-addon-api)
 
 # NOTE(mroberts): Workaround for
@@ -344,8 +327,6 @@ set(node_addon_api_dir ${CMAKE_SOURCE_DIR}/node_modules/node-addon-api)
 #
 # is to include all the header files here.
 target_include_directories(${MODULE} SYSTEM PRIVATE
-  #${CMAKE_JS_INC}
-  #${CMAKE_SOURCE_DIR}/node_modules
   ${node_addon_api_dir}/..
   ${libwebrtc_source_dir}
   ${libwebrtc_source_dir}/webrtc
@@ -368,7 +349,6 @@ target_link_libraries(${MODULE} PRIVATE
   ${CMAKE_THREAD_LIBS_INIT}
   libpeerconnection
   libwebrtc
-  #${CMAKE_JS_LIB}
 )
 
 target_compile_definitions(${MODULE} PRIVATE
@@ -377,9 +357,9 @@ target_compile_definitions(${MODULE} PRIVATE
 )
 
 if(WIN32)
-  set_property(TARGET ${MODULE}
-    PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
-  )
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT /GR-")
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd /GR- -D_HAS_ITERATOR_DEBUGGING=0")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /FORCE:UNRESOLVED")
 
   target_link_libraries(${MODULE} PRIVATE
     dmoguids.lib
@@ -396,14 +376,30 @@ if(WIN32)
     -DNOGDI
     -DNOMINMAX
     -DWEBRTC_WIN
-    "$<$<CONFIG:Debug>:-D_HAS_ITERATOR_DEBUGGING=0>"
   )
 else()
+  # NOTE(mroberts): Workaround for
+  #
+  #   https://gitlab.kitware.com/cmake/cmake/issues/15052
+  #
+  # is to include all the header files here.
+  target_include_directories(${MODULE} SYSTEM PRIVATE
+    ${libc++_include_dir}
+    ${libc++abi_include_dir}
+  )
+
+  # NOTE(mroberts): On Linux and macOS, we statically link the same libc++ and
+  # libc++abi libraries that libwebrtc builds against.
   target_link_libraries(${MODULE} PRIVATE
     -lc
     -lm
     libc++
   )
+  if(NOT APPLE)
+    target_link_libraries(${MODULE} PRIVATE
+      libc++abi
+    )
+  endif()
 
   target_compile_options(${MODULE} PRIVATE
     -fno-rtti
@@ -419,45 +415,41 @@ else()
     -Wno-suggest-override
     -Wpedantic
   )
-
-  target_compile_definitions(${MODULE} PRIVATE
-    -DWEBRTC_POSIX=1
-    "$<$<CONFIG:Debug>:-DDEBUG>"
-  )
-
-  if (APPLE OR "$ENV{TARGET_ARCH}" STREQUAL "arm" OR "$ENV{TARGET_ARCH}" STREQUAL "arm64")
-    # NOTE(mroberts): Workaround for
-    #
-    #   https://gitlab.kitware.com/cmake/cmake/issues/15052
-    #
-    # is to include all the header files here.
-    target_include_directories(${MODULE} SYSTEM PRIVATE
-      ${libc++_include_dir}
-      ${libc++abi_include_dir}
-    )
-
-  # NOTE(mroberts): On Arm Linux and macOS, we statically link the same libc++ and
-    # libc++abi libraries that libwebrtc builds against.
-    target_link_libraries(${MODULE} PRIVATE
-      libc++
-      libc++abi
-    )
-
+  if(APPLE)  # actually should be if(clang), but there is no such flag
     target_compile_options(${MODULE} PRIVATE
-      -nostdinc++
-      -nodefaultlibs
-    )
-
-    target_compile_definitions(${MODULE} PRIVATE
-      -D_LIBCPP_ABI_UNSTABLE
+      -Wno-missing-prototypes
     )
   endif()
 
-  if (APPLE)
+  target_compile_definitions(${MODULE} PRIVATE
+    -D_LIBCPP_ABI_UNSTABLE
+    -DWEBRTC_POSIX=1
+  )
+
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_options(${MODULE} PRIVATE
+      -g
+    )
+
+    target_compile_definitions(${MODULE} PRIVATE
+      -DDEBUG
+    )
+  endif()
+
+  if(APPLE)
     target_link_libraries(${MODULE} PRIVATE
       "-framework AppKit"
       "-framework AVFoundation"
     )
+
+    if ("$ENV{TARGET_ARCH}" STREQUAL "arm64")
+      target_compile_options(${MODULE} PRIVATE
+        -arch arm64
+      )
+      target_link_options(${MODULE} PRIVATE
+        -arch arm64
+      )
+    endif()
 
     target_compile_options(${MODULE} PRIVATE
       -Weverything
@@ -478,6 +470,7 @@ else()
     )
 
     target_compile_definitions(${MODULE} PRIVATE
+      -D_LIBCPP_ABI_UNSTABLE
       -DWEBRTC_MAC
       -DWEBRTC_IOS
     )
@@ -515,6 +508,11 @@ else()
         set(CMAKE_C_COMPILER ${tools}/bin/aarch64-linux-gnu-gcc)
         set(CMAKE_CXX_COMPILER ${tools}/bin/aarch64-linux-gnu-g++)
       endif()
+    else()
+      target_compile_options(${MODULE} PRIVATE
+        -B${libwebrtc_source_dir}/src/third_party/binutils/Linux_x64/Release/bin
+        --sysroot=${libwebrtc_source_dir}/src/build/linux/debian_sid_amd64-sysroot
+      )
     endif()
   endif()
 endif()
