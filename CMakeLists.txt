@@ -209,6 +209,9 @@ else()
     ${libwebrtc_binary_dir}/obj/libwebrtc.a
     ${libwebrtc_binary_dir}/obj/pc/libpeerconnection.a
   )
+  if (NOT APPLE)
+    list(APPEND byproducts ${libc++abi_objects})
+  endif()
 endif()
 
 ExternalProject_Add(
@@ -365,7 +368,7 @@ target_link_libraries(${MODULE} PRIVATE
   ${CMAKE_THREAD_LIBS_INIT}
   libpeerconnection
   libwebrtc
-  ${CMAKE_JS_LIB}
+  #${CMAKE_JS_LIB}
 )
 
 target_compile_definitions(${MODULE} PRIVATE
@@ -399,19 +402,22 @@ else()
   target_link_libraries(${MODULE} PRIVATE
     -lc
     -lm
+    libc++
   )
 
   target_compile_options(${MODULE} PRIVATE
     -fno-rtti
     -fvisibility=hidden
+    -nostdinc++
+    -nodefaultlibs
     -Wall
     -Wextra
     -Wno-missing-field-initializers
     -Wno-uninitialized
     -Wno-unused-local-typedefs
     -Wno-unused-variable
+    -Wno-suggest-override
     -Wpedantic
-    "$<$<CONFIG:Debug>:-g>"
   )
 
   target_compile_definitions(${MODULE} PRIVATE
