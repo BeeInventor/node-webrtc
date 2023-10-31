@@ -16,5 +16,5 @@ rm -f webrtc
 
 ln -s src webrtc
 
+# file not found
 #strings build/external/libwebrtc/download/src/third_party/llvm-build/Release+Asserts/lib/libstdc++.so.6
-sleep 60000
