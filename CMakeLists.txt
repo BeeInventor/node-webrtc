@@ -7,6 +7,8 @@ find_package(Threads REQUIRED)
 find_program(iwyu_path OPTIONAL NAMES include-what-you-use iwyu)
 find_program(clang_tidy_path OPTIONAL NAMES clang-tidy)
 
+set (CMAKE_CXX_STANDARD 14)
+
 # depot_tools
 # -----------------------------------------------------------------------------
 
