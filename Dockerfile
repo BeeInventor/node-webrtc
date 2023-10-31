@@ -2,14 +2,16 @@
 # https://github.com/BeeInventor/node-webrtc/blob/develop/docs/build-from-source.md
 FROM node:18 AS build
 ENV SKIP_DOWNLOAD=true
+ENV PARALLELISM=2
 WORKDIR /app
 RUN git clone https://github.com/BeeInventor/node-webrtc
 WORKDIR /app/node-webrtc
-RUN apt-get update && apt-get install build-essential cmake python-is-python3 python3-pip ninja-build -y
-RUN pip3 install setuptools --break-system-packages
+#RUN apt-get update && apt-get install build-essential libc6-dev cmake python python-pip ninja-build -y
+RUN apt-get update && apt-get install build-essential libc6-dev cmake python-is-python3 ninja-build python3-pkg-resources libglib2.0-dev clang libc++-dev libc++abi-dev -y
+#RUN pip install setuptools
+#RUN pip3 install setuptools --break-system-packages
 RUN npm install
 RUN npm run build
-RUN echo buiuld done?
 RUN ./node_modules/.bin/ncmake configure && ./node_modules/.bin/ncmake build
 RUN npm pack
 
