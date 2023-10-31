@@ -27,7 +27,7 @@
 set -e
 set -v
 
-string /build/external/libwebrtc/download/src/third_party/llvm-build/Release+Asserts/bin/../lib/libstdc++.so.6
+strings /build/external/libwebrtc/download/src/third_party/llvm-build/Release+Asserts/bin/../lib/libstdc++.so.6
 
 export TARGETS="webrtc libjingle_peerconnection"
 case "$(uname -s)" in
