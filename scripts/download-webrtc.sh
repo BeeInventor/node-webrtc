@@ -16,4 +16,5 @@ rm -f webrtc
 
 ln -s src webrtc
 
-strings build/external/libwebrtc/download/src/third_party/llvm-build/Release+Asserts/lib/libstdc++.so.6
+#strings build/external/libwebrtc/download/src/third_party/llvm-build/Release+Asserts/lib/libstdc++.so.6
+sleep 60000
