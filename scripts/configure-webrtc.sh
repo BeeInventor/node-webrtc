@@ -34,6 +34,7 @@ fi
 # version `GLIBCXX_3.4.30' not found (required by /lib/x86_64-linux-gnu/libicuuc.so.72)
 
 ls -l /app/node-webrtc/build/external/libwebrtc/download/src/third_party/llvm-build/Release+Asserts/lib/
+strings /app/node-webrtc/build/external/libwebrtc/download/src/third_party/llvm-build/Release+Asserts/lib/libstdc++.so.6
 echo "stop here"
 exit 1  
 
