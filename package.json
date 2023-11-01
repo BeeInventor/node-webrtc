@@ -17,10 +17,13 @@
   },
   "main": "lib/index.js",
   "browser": "lib/browser.js",
-  "binary": {
-    "module_name": "wrtc",
-    "module_path": "./build/Release/"
-  },
+  "files": [
+    "AUTHORS",
+    "CHANGELOG.md",
+    "lib",
+    "types",
+    "build/Release"
+  ],
   "engines": {
     "node": "^8.11.2 || >=10.0.0"
   },

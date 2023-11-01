@@ -20,6 +20,7 @@ RUN npm install
 RUN gcc --version && g++ --version && cmake --version
 RUN npm run build
 RUN ./node_modules/.bin/ncmake configure && ./node_modules/.bin/ncmake build
+RUN ls build/Release
 RUN npm pack
 
 FROM scratch AS release
