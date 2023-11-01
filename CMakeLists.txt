@@ -143,6 +143,7 @@ list(APPEND GN_GEN_ARGS
   rtc_include_pulse_audio=false
   rtc_include_tests=false
   rtc_use_h264=true
+  use_lld=false
 )
 if ("$ENV{TARGET_ARCH}" STREQUAL "arm")
   list(APPEND GN_GEN_ARGS
