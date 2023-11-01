@@ -22,19 +22,8 @@ fi
 # takes too long in CI; so do this manually.
 (cd build/util && python lastchange.py -o LASTCHANGE)
 
-
-#strings /usr/lib/x86_64-linux-gnu/libstdc++.so.6 | grep GLIBCXX
-#ls -la /usr/lib/x86_64-linux-gnu/libstdc++.so.6
-#ln -sf /usr/lib/x86_64-linux-gnu/libstdc+.so.6 build/external/libwebrtc/download/src/third_party/llvm-build/Release+Asserts/lib/libstdc++.so.6
-#ls -la build/external/libwebrtc/download/src/third_party/llvm-build/Release+Asserts/lib/libstdc++.so.6
-
-
-# err
-# /app/node-webrtc/build/external/libwebrtc/download/src/third_party/llvm-build/Release+Asserts/bin/../lib/libstdc++.so.6:
-# version `GLIBCXX_3.4.30' not found (required by /lib/x86_64-linux-gnu/libicuuc.so.72)
-
 # link proper libstdc++.so.6
-#rm /app/node-webrtc/build/external/libwebrtc/download/src/third_party/llvm-build/Release+Asserts/lib/libstdc++.so.6
-#ln -sf /usr/lib/x86_64-linux-gnu/libstdc+.so.6 /app/node-webrtc/build/external/libwebrtc/download/src/third_party/llvm-build/Release+Asserts/lib/libstdc++.so.6
+rm /app/node-webrtc/build/external/libwebrtc/download/src/third_party/llvm-build/Release+Asserts/lib/libstdc++.so.6
+ln -sf /usr/lib/x86_64-linux-gnu/libstdc+.so.6 /app/node-webrtc/build/external/libwebrtc/download/src/third_party/llvm-build/Release+Asserts/lib/libstdc++.so.6
 
 gn gen ${BINARY_DIR} "--args=${GN_GEN_ARGS}"
