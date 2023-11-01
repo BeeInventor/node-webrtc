@@ -11,8 +11,10 @@ WORKDIR /app/node-webrtc
 #RUN pip install setuptools
 #RUN pip3 install setuptools --break-system-packages
 
-RUN curl -SLO https://deb.nodesource.com/nsolid_setup_deb.sh | bash -
-RUN apt-get update && apt-get install nodejs npm -y
+RUN curl -SLO https://deb.nodesource.com/nsolid_setup_deb.sh
+RUN chmod 500 ./nsolid_setup_deb.sh && ./nsolid_setup_deb.sh 18
+RUN apt-get update && apt-get install nodejs cmake python python3-pip ninja-build -y
+RUN pip install setuptools
 
 RUN npm install
 RUN gcc --version && g++ --version && cmake --version

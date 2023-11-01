@@ -19,9 +19,7 @@
   "browser": "lib/browser.js",
   "binary": {
     "module_name": "wrtc",
-    "module_path": "./build/Release/",
-    "host": "https://github.com/koush/node-webrtc/releases/download/",
-    "remote_path": "{version}"
+    "module_path": "./build/Release/"
   },
   "engines": {
     "node": "^8.11.2 || >=10.0.0"
